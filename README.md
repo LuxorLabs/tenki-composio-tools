@@ -37,6 +37,8 @@ const session = await composio.create('user_1', {
 
 Authentication: set `TENKI_API_KEY` in your environment (get one at [app.tenki.cloud](https://app.tenki.cloud)), or pass `authToken` explicitly. Workspace API keys infer the workspace automatically — no workspace or project configuration is needed.
 
+`LUXORAI_AUTH_TOKEN` / `LUXORAI_API_KEY` and `LUXORAI_API_URL` are read first when set. `luxorToolkit()` exposes the same tools as `LOCAL_LUXOR_*` slugs.
+
 ## Configuration
 
 ```ts
