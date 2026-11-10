@@ -15,7 +15,7 @@
 
 ### Added
 
-- `LUXORAI_AUTH_TOKEN` / `LUXORAI_API_KEY` and `LUXORAI_API_ENDPOINT` / `LUXORAI_API_URL` are read before the SDK's `TENKI_*` fallback. Explicit options still win.
+- `LUXORAI_AUTH_TOKEN` / `LUXORAI_API_KEY` and `LUXORAI_API_ENDPOINT` / `LUXORAI_API_URL` and `LUXORAI_SANDBOX_GATEWAY_URL` are read before the SDK's `TENKI_*` fallback. Explicit options still win.
 - `luxorToolkit()`: the same six tools under the `LUXOR` toolkit slug (`LOCAL_LUXOR_CREATE_SANDBOX`, ...). `tenkiToolkit()` and its `LOCAL_TENKI_*` slugs are unchanged.
 
 ## 0.1.0 (2026-07-20)

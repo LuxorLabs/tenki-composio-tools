@@ -220,9 +220,11 @@ function createToolkit(brand: ToolkitBrand, options: TenkiToolkitOptions): Custo
   const getClient = (): TenkiSandbox => {
     const authToken = options.authToken || readLuxorAiEnv('AUTH_TOKEN', 'API_KEY');
     const baseUrl = options.baseUrl || readLuxorAiEnv('API_ENDPOINT', 'API_URL');
+    const gatewayAddress = readLuxorAiEnv('SANDBOX_GATEWAY_URL');
     client ??= new TenkiSandbox({
       ...(authToken ? { authToken } : {}),
       ...(baseUrl ? { baseUrl } : {}),
+      ...(gatewayAddress ? { gatewayAddress } : {}),
     });
     return client;
   };

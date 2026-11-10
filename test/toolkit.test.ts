@@ -154,7 +154,13 @@ describe('luxorToolkit alias', () => {
 });
 
 describe('LUXORAI_* env', () => {
-  const KEYS = ['LUXORAI_AUTH_TOKEN', 'LUXORAI_API_KEY', 'LUXORAI_API_ENDPOINT', 'LUXORAI_API_URL'];
+  const KEYS = [
+    'LUXORAI_AUTH_TOKEN',
+    'LUXORAI_API_KEY',
+    'LUXORAI_API_ENDPOINT',
+    'LUXORAI_API_URL',
+    'LUXORAI_SANDBOX_GATEWAY_URL',
+  ];
   beforeEach(() => {
     for (const k of KEYS) vi.stubEnv(k, '');
   });
@@ -181,6 +187,13 @@ describe('LUXORAI_* env', () => {
     expect(TenkiSandbox).toHaveBeenLastCalledWith({ authToken: 'lx_token' });
     await execute(tenkiToolkit({ authToken: 'tk_explicit' }), 'LIST_SANDBOXES', {});
     expect(TenkiSandbox).toHaveBeenLastCalledWith({ authToken: 'tk_explicit' });
+  });
+
+  it('passes LUXORAI_SANDBOX_GATEWAY_URL as the pinned gateway', async () => {
+    vi.stubEnv('LUXORAI_SANDBOX_GATEWAY_URL', 'gateway.luxor.test:443');
+    mockClient();
+    await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
+    expect(TenkiSandbox).toHaveBeenLastCalledWith({ gatewayAddress: 'gateway.luxor.test:443' });
   });
 
   it('leaves auth to the SDK env fallback when no LUXORAI_* value is set', async () => {
