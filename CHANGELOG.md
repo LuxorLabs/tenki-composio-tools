@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2026-11-12)
+
+- Package page now shows Luxor names, install commands and docs links.
+
 ## 0.2.0 (2026-07-24)
 
 ### Breaking changes
