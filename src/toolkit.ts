@@ -17,6 +17,8 @@
  * });
  * // Agent can now call LOCAL_TENKI_CREATE_SANDBOX, LOCAL_TENKI_EXEC_COMMAND, ...
  * ```
+ *
+ * `luxorToolkit()` exposes the same tools as LOCAL_LUXOR_* slugs.
  */
 import { experimental_createTool, experimental_createToolkit } from '@composio/core';
 import type { CustomToolkit } from '@composio/core';
@@ -36,9 +38,9 @@ import { z } from 'zod/v3';
 
 /** Options for {@link tenkiToolkit}. All optional; env vars fill the gaps. */
 export interface TenkiToolkitOptions {
-  /** Tenki API key. Defaults to the TENKI_API_KEY environment variable. Workspace API keys infer the workspace automatically. */
+  /** Tenki API key. Defaults to LUXORAI_AUTH_TOKEN / LUXORAI_API_KEY, then TENKI_AUTH_TOKEN / TENKI_API_KEY. Workspace API keys infer the workspace automatically. */
   authToken?: string;
-  /** Override the Tenki API base URL (rarely needed). */
+  /** Override the Tenki API base URL (rarely needed). Defaults to LUXORAI_API_ENDPOINT / LUXORAI_API_URL, then the SDK's TENKI_* fallback. */
   baseUrl?: string;
   /** When true, expose the tools in session.tools() without the agent having to search first. */
   preload?: boolean;
@@ -166,12 +168,63 @@ function snapshotSummary(snapshot: Snapshot): ToolResult {
  * `{ success: false, error }` result on the first call instead.
  */
 export function tenkiToolkit(options: TenkiToolkitOptions = {}): CustomToolkit {
+  return createToolkit(TENKI_BRAND, options);
+}
+
+/**
+ * The same toolkit under the LUXOR slug (LOCAL_LUXOR_CREATE_SANDBOX, ...), for
+ * agents configured with Luxor AI tool names. Use one of the two per session.
+ */
+export function luxorToolkit(options: TenkiToolkitOptions = {}): CustomToolkit {
+  return createToolkit(LUXOR_BRAND, options);
+}
+
+interface ToolkitBrand {
+  slug: 'TENKI' | 'LUXOR';
+  name: string;
+  description: string;
+}
+
+const TOOLKIT_DESCRIPTION_TAIL =
+  'Use these tools whenever you need an isolated Linux environment to run shell commands or code safely: ' +
+  'create a sandbox, execute commands in it, snapshot its state, and terminate it when done.';
+
+const TENKI_BRAND: ToolkitBrand = {
+  slug: 'TENKI',
+  name: 'Tenki Sandboxes',
+  description:
+    'Disposable Linux microVMs from Tenki (tenki.cloud) that boot in ~2-4 seconds. ' +
+    TOOLKIT_DESCRIPTION_TAIL,
+};
+
+const LUXOR_BRAND: ToolkitBrand = {
+  slug: 'LUXOR',
+  name: 'Luxor Sandboxes',
+  description:
+    'Disposable Linux microVMs from Luxor (luxor.ai) that boot in ~2-4 seconds. ' +
+    TOOLKIT_DESCRIPTION_TAIL,
+};
+
+/** First non-empty `LUXORAI_<suffix>`; the SDK itself falls back to the `TENKI_*` names. */
+export function readLuxorAiEnv(...suffixes: string[]): string | undefined {
+  for (const suffix of suffixes) {
+    const value = process.env[`LUXORAI_${suffix}`]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function createToolkit(brand: ToolkitBrand, options: TenkiToolkitOptions): CustomToolkit {
   let client: TenkiSandbox | undefined;
 
   const getClient = (): TenkiSandbox => {
+    const authToken = options.authToken || readLuxorAiEnv('AUTH_TOKEN', 'API_KEY');
+    const baseUrl = options.baseUrl || readLuxorAiEnv('API_ENDPOINT', 'API_URL');
+    const gatewayAddress = readLuxorAiEnv('SANDBOX_GATEWAY_URL');
     client ??= new TenkiSandbox({
-      ...(options.authToken ? { authToken: options.authToken } : {}),
-      ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
+      ...(authToken ? { authToken } : {}),
+      ...(baseUrl ? { baseUrl } : {}),
+      ...(gatewayAddress ? { gatewayAddress } : {}),
     });
     return client;
   };
@@ -181,7 +234,7 @@ export function tenkiToolkit(options: TenkiToolkitOptions = {}): CustomToolkit {
     description:
       'Create a fresh, isolated Linux microVM (Tenki sandbox) and wait until it is ready to accept commands (~2-4s). ' +
       'Use this before EXEC_COMMAND when you need a safe environment to run code, install packages, or test commands. ' +
-      'Returns the sessionId required by all other TENKI tools. Outbound internet access is controlled by allowOutbound (workspace defaults apply when omitted) — check outboundNetworking in the response. ' +
+      `Returns the sessionId required by all other ${brand.slug} tools. Outbound internet access is controlled by allowOutbound (workspace defaults apply when omitted); check outboundNetworking in the response. ` +
       'Sandboxes self-terminate after maxDurationMinutes (default 30) as a safety backstop.',
     inputParams: z.object({
       name: z.string().max(100).optional().describe('Human-readable sandbox name.'),
@@ -397,12 +450,9 @@ export function tenkiToolkit(options: TenkiToolkitOptions = {}): CustomToolkit {
       }),
   });
 
-  return experimental_createToolkit('TENKI', {
-    name: 'Tenki Sandboxes',
-    description:
-      'Disposable Linux microVMs from Tenki (tenki.cloud) that boot in ~2-4 seconds. ' +
-      'Use these tools whenever you need an isolated Linux environment to run shell commands or code safely: ' +
-      'create a sandbox, execute commands in it, snapshot its state, and terminate it when done.',
+  return experimental_createToolkit(brand.slug, {
+    name: brand.name,
+    description: brand.description,
     ...(options.preload !== undefined ? { preload: options.preload } : {}),
     tools: [
       createSandbox,

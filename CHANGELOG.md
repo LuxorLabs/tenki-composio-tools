@@ -13,6 +13,11 @@
 - Bumped `@tenkicloud/sandbox` from `^0.3.6` to `^0.5.4`.
 - One fewer network round-trip on the first `CREATE_SANDBOX` call (the `whoAmI()` resolution step is gone).
 
+### Added
+
+- `LUXORAI_AUTH_TOKEN` / `LUXORAI_API_KEY` and `LUXORAI_API_ENDPOINT` / `LUXORAI_API_URL` and `LUXORAI_SANDBOX_GATEWAY_URL` are read before the SDK's `TENKI_*` fallback. Explicit options still win.
+- `luxorToolkit()`: the same six tools under the `LUXOR` toolkit slug (`LOCAL_LUXOR_CREATE_SANDBOX`, ...). `tenkiToolkit()` and its `LOCAL_TENKI_*` slugs are unchanged.
+
 ## 0.1.0 (2026-07-20)
 
 Initial release: `tenkiToolkit()` custom toolkit for Composio with six tools — `CREATE_SANDBOX`, `EXEC_COMMAND`, `LIST_SANDBOXES`, `GET_SANDBOX`, `CREATE_SNAPSHOT`, `TERMINATE_SANDBOX`. Failure-atomic boot, 30-minute max-duration backstop, structured error results, LLM-friendly output truncation.

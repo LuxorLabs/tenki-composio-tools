@@ -1,1 +1,1 @@
-export { tenkiToolkit, type TenkiToolkitOptions } from './toolkit';
+export { luxorToolkit, tenkiToolkit, type TenkiToolkitOptions } from './toolkit';
