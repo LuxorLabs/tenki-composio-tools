@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 (2026-11-17)
+
+- Environment variables now use the `LUXOR_` prefix (for example `LUXOR_API_KEY`). `LUXORAI_*` variables are no longer read; `TENKI_*` still works as a fallback. `LUXOR_API_KEY` is only used when it starts with `lx_` or `tk_`.
+- Upgraded `@tenkicloud/sandbox` from `^0.5.4` to `^1.5.3` so `lx_` keys authenticate: they are now sent as Bearer tokens, like `tk_` keys. Tokens that do not start with `lx_` or `tk_` are rejected with `InvalidAuthTokenError`, the default API endpoint is `https://api.luxor.ai`, and `EXEC_COMMAND` now enforces `timeoutSeconds` (a command that runs out of time returns `status: "TIMED_OUT"`).
+
 ## 0.2.1 (2026-11-12)
 
 - Package page now shows Luxor names, install commands and docs links.

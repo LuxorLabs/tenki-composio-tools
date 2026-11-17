@@ -39,13 +39,13 @@ const session = await composio.create('user_1', {
 
 > Note: toolkits bind via `experimental.customToolkits` (standalone tools use `experimental.customTools`).
 
-Authentication: set `LUXORAI_API_KEY` (or `LUXORAI_AUTH_TOKEN`) in your environment (get an `lx_` key at [luxor.ai](https://luxor.ai/docs/)), or pass `authToken` explicitly. Workspace API keys infer the workspace automatically, so no workspace or project configuration is needed. `LUXORAI_API_URL` and `LUXORAI_SANDBOX_GATEWAY_URL` override the endpoints. The `TENKI_*` names (`TENKI_API_KEY`, ...) and `tk_` keys are still accepted; `LUXORAI_*` wins when both are set.
+Authentication: set `LUXOR_API_KEY` (or `LUXOR_AUTH_TOKEN`) in your environment (get an `lx_` key at [luxor.ai](https://luxor.ai/docs/)), or pass `authToken` explicitly. Workspace API keys infer the workspace automatically, so no workspace or project configuration is needed. `LUXOR_API_URL` and `LUXOR_SANDBOX_GATEWAY_URL` override the endpoints. The `TENKI_*` names (`TENKI_API_KEY`, ...) and `tk_` keys are still accepted; `LUXOR_*` wins when both are set. `LUXOR_API_KEY` is only used when it starts with `lx_` or `tk_`; any other value is ignored.
 
 ## Configuration
 
 ```ts
 luxorToolkit({
-  authToken: 'lx_…', // default: LUXORAI_API_KEY env var (TENKI_API_KEY still accepted)
+  authToken: 'lx_…', // default: LUXOR_API_KEY env var (TENKI_API_KEY still accepted)
   preload: true, // expose tools in session.tools() without searching first
   bootTimeoutMs: 120_000, // creation + readiness budget; failed boots are terminated, not leaked
   defaults: {
@@ -75,7 +75,7 @@ Lifecycle guarantees: `CREATE_SANDBOX` is **failure-atomic**: the session handle
 
 ## Security
 
-- `LUXORAI_API_KEY` (or `TENKI_API_KEY`) grants control over your Luxor workspace. Keep it in the host environment, never inside sandboxes.
+- `LUXOR_API_KEY` (or `TENKI_API_KEY`) grants control over your Luxor workspace. Keep it in the host environment, never inside sandboxes.
 - Tools run in-process in _your_ application (the host you run the Composio session from), not on Composio's servers.
 - The agent decides what commands to run; the sandbox is your isolation boundary. Set `allowOutbound: false` explicitly (per call or via `defaults`) if your workspace default is open and the task doesn't need network.
 
