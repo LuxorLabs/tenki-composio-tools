@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2026-11-17)
+
+- Environment variables now use the `LUXOR_` prefix (for example `LUXOR_API_KEY`). `LUXORAI_*` variables are no longer read; `TENKI_*` still works as a fallback. `LUXOR_API_KEY` is only used when it starts with `lx_` or `tk_`.
+
 ## 0.2.1 (2026-11-12)
 
 - Package page now shows Luxor names, install commands and docs links.
