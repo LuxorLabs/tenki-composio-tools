@@ -153,13 +153,15 @@ describe('luxorToolkit alias', () => {
   });
 });
 
-describe('LUXORAI_* env', () => {
+describe('LUXOR_* env', () => {
   const KEYS = [
-    'LUXORAI_AUTH_TOKEN',
-    'LUXORAI_API_KEY',
-    'LUXORAI_API_ENDPOINT',
-    'LUXORAI_API_URL',
-    'LUXORAI_SANDBOX_GATEWAY_URL',
+    'TENKI_AUTH_TOKEN',
+    'TENKI_API_KEY',
+    'LUXOR_AUTH_TOKEN',
+    'LUXOR_API_KEY',
+    'LUXOR_API_ENDPOINT',
+    'LUXOR_API_URL',
+    'LUXOR_SANDBOX_GATEWAY_URL',
   ];
   beforeEach(() => {
     for (const k of KEYS) vi.stubEnv(k, '');
@@ -168,9 +170,9 @@ describe('LUXORAI_* env', () => {
     vi.unstubAllEnvs();
   });
 
-  it('passes LUXORAI_API_KEY and LUXORAI_API_URL to the SDK ahead of its TENKI_* fallback', async () => {
-    vi.stubEnv('LUXORAI_API_KEY', 'lx_key');
-    vi.stubEnv('LUXORAI_API_URL', 'https://api.luxor.test');
+  it('passes LUXOR_API_KEY and LUXOR_API_URL to the SDK ahead of its TENKI_* fallback', async () => {
+    vi.stubEnv('LUXOR_API_KEY', 'lx_key');
+    vi.stubEnv('LUXOR_API_URL', 'https://api.luxor.test');
     mockClient();
     await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
     expect(TenkiSandbox).toHaveBeenCalledWith({
@@ -179,9 +181,9 @@ describe('LUXORAI_* env', () => {
     });
   });
 
-  it('prefers LUXORAI_AUTH_TOKEN over LUXORAI_API_KEY, and explicit options over both', async () => {
-    vi.stubEnv('LUXORAI_AUTH_TOKEN', 'lx_token');
-    vi.stubEnv('LUXORAI_API_KEY', 'lx_key');
+  it('prefers LUXOR_AUTH_TOKEN over LUXOR_API_KEY, and explicit options over both', async () => {
+    vi.stubEnv('LUXOR_AUTH_TOKEN', 'lx_token');
+    vi.stubEnv('LUXOR_API_KEY', 'lx_key');
     mockClient();
     await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
     expect(TenkiSandbox).toHaveBeenLastCalledWith({ authToken: 'lx_token' });
@@ -189,17 +191,68 @@ describe('LUXORAI_* env', () => {
     expect(TenkiSandbox).toHaveBeenLastCalledWith({ authToken: 'tk_explicit' });
   });
 
-  it('passes LUXORAI_SANDBOX_GATEWAY_URL as the pinned gateway', async () => {
-    vi.stubEnv('LUXORAI_SANDBOX_GATEWAY_URL', 'gateway.luxor.test:443');
+  it('passes LUXOR_SANDBOX_GATEWAY_URL as the pinned gateway', async () => {
+    vi.stubEnv('LUXOR_SANDBOX_GATEWAY_URL', 'gateway.luxor.test:443');
     mockClient();
     await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
     expect(TenkiSandbox).toHaveBeenLastCalledWith({ gatewayAddress: 'gateway.luxor.test:443' });
   });
 
-  it('leaves auth to the SDK env fallback when no LUXORAI_* value is set', async () => {
+  it('leaves auth to the SDK env fallback when no LUXOR_* value is set', async () => {
     mockClient();
     await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
     expect(TenkiSandbox).toHaveBeenLastCalledWith({});
+  });
+
+  describe('LUXOR_API_KEY guard', () => {
+    // Build the real SDK client so its own TENKI_* fallback and missing-key error apply.
+    async function mockClientWithRealAuth(): Promise<MockClient> {
+      const actual =
+        await vi.importActual<typeof import('@tenkicloud/sandbox')>('@tenkicloud/sandbox');
+      const client = mockClient();
+      vi.mocked(TenkiSandbox).mockImplementation(opts => {
+        new actual.TenkiSandbox(opts);
+        return client as unknown as TenkiSandbox;
+      });
+      return client;
+    }
+
+    it.each([['lx_key'], ['tk_key'], ['  lx_padded  ']])('uses %j', async value => {
+      vi.stubEnv('LUXOR_API_KEY', value);
+      vi.stubEnv('TENKI_API_KEY', 'tk_legacy');
+      mockClient();
+      await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
+      expect(TenkiSandbox).toHaveBeenLastCalledWith({ authToken: value.trim() });
+    });
+
+    it('ignores a non-prefixed value so the SDK uses TENKI_API_KEY', async () => {
+      vi.stubEnv('LUXOR_API_KEY', 'pool-key-123');
+      vi.stubEnv('TENKI_API_KEY', 'tk_legacy');
+      const client = await mockClientWithRealAuth();
+      const result = await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
+      expect(TenkiSandbox).toHaveBeenLastCalledWith({});
+      expect(result.success).toBe(true);
+      expect(client.list).toHaveBeenCalled();
+    });
+
+    it('reports the missing key when a non-prefixed value is the only credential', async () => {
+      vi.stubEnv('LUXOR_API_KEY', 'pool-key-123');
+      await mockClientWithRealAuth();
+      const result = await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
+      expect(TenkiSandbox).toHaveBeenLastCalledWith({});
+      expect(result.success).toBe(false);
+      expect(result.error).toMatchObject({ type: 'MissingAuthTokenError' });
+      expect((result.error as { message: string }).message).toContain('TENKI_API_KEY');
+    });
+
+    it('does not guard LUXOR_AUTH_TOKEN or an explicit authToken', async () => {
+      vi.stubEnv('LUXOR_AUTH_TOKEN', 'opaque-token');
+      mockClient();
+      await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
+      expect(TenkiSandbox).toHaveBeenLastCalledWith({ authToken: 'opaque-token' });
+      await execute(tenkiToolkit({ authToken: 'explicit-token' }), 'LIST_SANDBOXES', {});
+      expect(TenkiSandbox).toHaveBeenLastCalledWith({ authToken: 'explicit-token' });
+    });
   });
 });
 

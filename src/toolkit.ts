@@ -38,9 +38,9 @@ import { z } from 'zod/v3';
 
 /** Options for {@link tenkiToolkit}. All optional; env vars fill the gaps. */
 export interface TenkiToolkitOptions {
-  /** Tenki API key. Defaults to LUXORAI_AUTH_TOKEN / LUXORAI_API_KEY, then TENKI_AUTH_TOKEN / TENKI_API_KEY. Workspace API keys infer the workspace automatically. */
+  /** Tenki API key. Defaults to LUXOR_AUTH_TOKEN / LUXOR_API_KEY (only when it starts with lx_ or tk_), then TENKI_AUTH_TOKEN / TENKI_API_KEY. Workspace API keys infer the workspace automatically. */
   authToken?: string;
-  /** Override the Tenki API base URL (rarely needed). Defaults to LUXORAI_API_ENDPOINT / LUXORAI_API_URL, then the SDK's TENKI_* fallback. */
+  /** Override the Tenki API base URL (rarely needed). Defaults to LUXOR_API_ENDPOINT / LUXOR_API_URL, then the SDK's TENKI_* fallback. */
   baseUrl?: string;
   /** When true, expose the tools in session.tools() without the agent having to search first. */
   preload?: boolean;
@@ -205,11 +205,14 @@ const LUXOR_BRAND: ToolkitBrand = {
     TOOLKIT_DESCRIPTION_TAIL,
 };
 
-/** First non-empty `LUXORAI_<suffix>`; the SDK itself falls back to the `TENKI_*` names. */
-export function readLuxorAiEnv(...suffixes: string[]): string | undefined {
+/** First usable `LUXOR_<suffix>`; the SDK itself falls back to the `TENKI_*` names. */
+export function readLuxorEnv(...suffixes: string[]): string | undefined {
   for (const suffix of suffixes) {
-    const value = process.env[`LUXORAI_${suffix}`]?.trim();
-    if (value) return value;
+    const value = process.env[`LUXOR_${suffix}`]?.trim();
+    if (!value) continue;
+    // LUXOR_API_KEY may hold a Luxor Mining Pool key; only lx_/tk_ keys are ours.
+    if (suffix === 'API_KEY' && !/^(lx|tk)_/.test(value)) continue;
+    return value;
   }
   return undefined;
 }
@@ -218,9 +221,9 @@ function createToolkit(brand: ToolkitBrand, options: TenkiToolkitOptions): Custo
   let client: TenkiSandbox | undefined;
 
   const getClient = (): TenkiSandbox => {
-    const authToken = options.authToken || readLuxorAiEnv('AUTH_TOKEN', 'API_KEY');
-    const baseUrl = options.baseUrl || readLuxorAiEnv('API_ENDPOINT', 'API_URL');
-    const gatewayAddress = readLuxorAiEnv('SANDBOX_GATEWAY_URL');
+    const authToken = options.authToken || readLuxorEnv('AUTH_TOKEN', 'API_KEY');
+    const baseUrl = options.baseUrl || readLuxorEnv('API_ENDPOINT', 'API_URL');
+    const gatewayAddress = readLuxorEnv('SANDBOX_GATEWAY_URL');
     client ??= new TenkiSandbox({
       ...(authToken ? { authToken } : {}),
       ...(baseUrl ? { baseUrl } : {}),
