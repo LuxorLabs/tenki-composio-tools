@@ -1,3 +1,5 @@
+import { createServer, type Http2Server } from 'node:http2';
+import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CustomTool, CustomToolkit, SessionContext } from '@composio/core';
 import {
@@ -245,6 +247,15 @@ describe('LUXOR_* env', () => {
       expect((result.error as { message: string }).message).toContain('TENKI_API_KEY');
     });
 
+    it('rejects a non-prefixed TENKI_API_KEY in the SDK as a structured error', async () => {
+      vi.stubEnv('LUXOR_API_KEY', 'pool-key-123');
+      vi.stubEnv('TENKI_API_KEY', 'legacy-opaque');
+      await mockClientWithRealAuth();
+      const result = await execute(tenkiToolkit(), 'LIST_SANDBOXES', {});
+      expect(result.success).toBe(false);
+      expect(result.error).toMatchObject({ type: 'InvalidAuthTokenError' });
+    });
+
     it('does not guard LUXOR_AUTH_TOKEN or an explicit authToken', async () => {
       vi.stubEnv('LUXOR_AUTH_TOKEN', 'opaque-token');
       mockClient();
@@ -253,6 +264,66 @@ describe('LUXOR_* env', () => {
       await execute(tenkiToolkit({ authToken: 'explicit-token' }), 'LIST_SANDBOXES', {});
       expect(TenkiSandbox).toHaveBeenLastCalledWith({ authToken: 'explicit-token' });
     });
+  });
+});
+
+describe('auth on the wire (real SDK client)', () => {
+  let server: Http2Server;
+  let baseUrl: string;
+  let seen: Array<{ authorization?: string; cookie?: string }>;
+  let clients: TenkiSandbox[];
+
+  beforeEach(async () => {
+    for (const k of ['TENKI_AUTH_TOKEN', 'TENKI_API_KEY', 'LUXOR_AUTH_TOKEN', 'LUXOR_API_KEY']) {
+      vi.stubEnv(k, '');
+    }
+    seen = [];
+    clients = [];
+    // Local h2c endpoint: records the auth headers, then fails the RPC as UNAUTHENTICATED.
+    server = createServer();
+    // client.close() resets the connection, which is not a test failure.
+    server.on('session', session => session.on('error', () => {}));
+    server.on('stream', (stream, headers) => {
+      stream.on('error', () => {});
+      seen.push({ authorization: headers.authorization, cookie: headers.cookie });
+      stream.respond(
+        { ':status': 200, 'content-type': 'application/grpc', 'grpc-status': '16' },
+        { endStream: true }
+      );
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+    const actual =
+      await vi.importActual<typeof import('@tenkicloud/sandbox')>('@tenkicloud/sandbox');
+    vi.mocked(TenkiSandbox).mockImplementation(opts => {
+      const client = new actual.TenkiSandbox(opts);
+      clients.push(client);
+      return client;
+    });
+  });
+
+  afterEach(async () => {
+    for (const client of clients) client.close();
+    await new Promise(resolve => server.close(resolve));
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    ['LUXOR_API_KEY', 'lx_wire_key'],
+    ['LUXOR_API_KEY', 'tk_wire_key'],
+    ['TENKI_API_KEY', 'lx_legacy_var'],
+  ])('sends %s=%s as a Bearer token, not a cookie', async (name, value) => {
+    vi.stubEnv(name, value);
+    const result = await execute(tenkiToolkit({ baseUrl }), 'LIST_SANDBOXES', {});
+    expect(seen).toEqual([{ authorization: `Bearer ${value}`, cookie: undefined }]);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatchObject({ type: 'UnauthorizedError' });
+  });
+
+  it('sends an explicit lx_ authToken as a Bearer token', async () => {
+    await execute(luxorToolkit({ authToken: 'lx_explicit', baseUrl }), 'LIST_SANDBOXES', {});
+    expect(seen).toEqual([{ authorization: 'Bearer lx_explicit', cookie: undefined }]);
   });
 });
 
